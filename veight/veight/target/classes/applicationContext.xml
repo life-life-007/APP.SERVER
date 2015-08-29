@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+	http://www.springframework.org/schema/beans/spring-beans.xsd
+	http://www.springframework.org/schema/context
+	http://www.springframework.org/schema/context/spring-context.xsd
+	http://www.springframework.org/schema/aop
+	http://www.springframework.org/schema/aop/spring-aop.xsd
+	http://www.springframework.org/schema/tx 
+	http://www.springframework.org/schema/tx/spring-tx.xsd">
+	<!-- 使用注解注入 -->
+	<context:annotation-config />
+	<!-- JDBC参数配置 -->
+	<bean
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer"
+		lazy-init="true">
+		<property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE" />
+		<property name="ignoreResourceNotFound" value="true" />
+		<property name="locations">
+			<list>
+				<value>classpath:/jdbc.properties</value>
+			</list>
+		</property>
+	</bean>
+	<!-- 连接池配置 C3p0-->
+	<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+		<property name="driverClass" value="${jdbc.driver}"></property>
+		<property name="jdbcUrl" value="${jdbc.url}"></property>
+		<property name="user" value="${jdbc.username}"></property>
+		<property name="password" value="${jdbc.password}"></property>
+	</bean>
+	<!-- 配置hibernate信息 -->
+	<bean id="sessionFactory"
+		class="org.springframework.orm.hibernate3.annotation.AnnotationSessionFactoryBean">
+		<!-- 配置Hibernate拦截器,自动填充数据的插入、更新时间 -->
+		<property name="dataSource" ref="dataSource" />
+		<property name="hibernateProperties">
+			<value>
+				<!-- 设置数据库方言 -->
+				hibernate.dialect=${hibernate.dialect}
+				<!-- 设置自动创建|更新|验证数据库表结构 -->
+				hibernate.hbm2ddl.auto=update
+				<!-- 输出SQL语句到控制台 -->
+				hibernate.show_sql=${hibernate.show_sql}
+				<!-- 格式化输出到控制台的SQL语句 -->
+				hibernate.format_sql=${hibernate.format_sql}
+				<!-- 是否开启二级缓存 -->
+				hibernate.cache.use_second_level_cache=false
+				<!-- 配置二级缓存产品 -->
+				hibernate.cache.provider_class=org.hibernate.cache.OSCacheProvider
+				<!-- 是否开启查询缓存 -->
+				hibernate.cache.use_query_cache=false
+				<!-- 数据库批量查询数 -->
+				hibernate.jdbc.fetch_size=50
+				<!-- 数据库批量更新数 -->
+				hibernate.jdbc.batch_size=30
+			</value>
+		</property>
+
+		<property name="annotatedClasses">
+			<list>
+				<value>org.veight.admin.domain.Admin</value>
+			</list>
+		</property>
+	</bean>
+	<!-- 设置需要进行Spring注解扫描的类包 -->
+	<context:component-scan base-package="org.veight" />
+	<!-- 配置freemarkerManager -->
+	<bean id="freemarkerManager" class="org.apache.struts2.views.freemarker.FreemarkerManager" />
+
+	<!--
+		配置日志 使用Aop 记录日志
+		注意:
+			1). 此处proxy-target-class="true" 否则Action内的参数会被拦截掉,导致action内无法获得前台传递的参数
+			2). Action需交给spring容器去管理
+	-->
+	<aop:config expose-proxy="true" proxy-target-class="true">
+		<aop:aspect  id="aopRiZhiAspect" ref="myRiZhi">
+			<!-- 对那些方法进行日志记录, 此处屏蔽action内的set get方法 -->
+			<aop:pointcut id="aopRiZhi" expression="(execution(* org.veight.*.action.*.*(..)) ) and (!execution(* org.veight.*.action.*.set*(..)) ) and (!execution(* org.veight.*.action.*.get*(..)) )" />
+			<aop:before pointcut-ref="aopRiZhi" method="doBefore"/>
+			<aop:after pointcut-ref="aopRiZhi" method="doAfter"/>
+			<aop:around pointcut-ref="aopRiZhi" method="doAround"/>
+		</aop:aspect>
+	</aop:config>
+
+	<bean id="myRiZhi" class="org.veight.log.MyLog"></bean>	<!-- Aop日志类 -->
+
+	<!-- 要使用spring aop记录日志的action 需要交给spring容器来管理 -->
+	<bean id="logonAction" class="org.veight.logon.action.LogonAction" scope="prototype" ></bean>
+
+
+</beans>
